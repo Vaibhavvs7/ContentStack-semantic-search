@@ -20,9 +20,11 @@
   "dependencies": {
     "@contentstack/delivery-sdk": "^4.8.0",
     "@contentstack/live-preview-utils": "^3.4.0",
+    "@pinecone-database/pinecone": "^6.1.2",
     "@timbenniks/contentstack-endpoints": "^1.0.14",
     "dompurify": "^3.2.6",
     "next": "15.4.6",
+    "openai": "^5.20.0",
     "react": "^19.1.1",
     "react-dom": "^19.1.1"
   },

@@ -71,3 +71,11 @@ export interface Page {
   rich_text?: string;
   blocks?: Blocks[];
 }
+
+// lib/types.ts
+export interface Product {
+  uid: string;
+  title: string;
+  description?: string;
+  // add other fields from your product content type if needed
+}
