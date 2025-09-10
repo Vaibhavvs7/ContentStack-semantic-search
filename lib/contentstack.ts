@@ -88,3 +88,9 @@ export async function getPage(url: string) {
     return entry; // Returning the fetched entry
   }
 }
+
+// Function to fetch ALL entries of a given content type
+export async function getAllEntries<T>(contentType: string): Promise<T[]> {
+  const result = await stack.contentType(contentType).entry().query().find<T>();
+  return (result as any)?.entries || [];
+}

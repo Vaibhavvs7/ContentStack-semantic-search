@@ -4,55 +4,127 @@ import { getEmbedding } from "@/lib/embeddings";
 import { index } from "@/lib/pinecone";
 import type { Page } from "@/lib/types";
 
-// Ensure we run on the Node.js runtime (not Edge) because we use Node libs and env vars
 export const runtime = "nodejs";
 
-// Build a clean text blob from a Page entry for embedding
-function pageToText(p: Page): string {
+// 🟢 Utility: Build clean text for embedding
+function entryToText(entry: any): string {
   const parts: string[] = [];
-  if (p.title) parts.push(p.title);
-  if (p.description) parts.push(p.description);
-  if (p.rich_text) parts.push(p.rich_text);
-  if (Array.isArray(p.blocks)) {
-    for (const b of p.blocks) {
-      const blk = (b as any)?.block as any;
-      if (blk?.title) parts.push(String(blk.title));
-      if (blk?.copy) parts.push(String(blk.copy));
+  for (const key of Object.keys(entry)) {
+    const val = entry[key];
+    if (typeof val === "string") parts.push(val);
+    if (Array.isArray(val)) {
+      for (const item of val) {
+        if (typeof item === "string") parts.push(item);
+        if (typeof item === "object") parts.push(entryToText(item));
+      }
+    }
+    if (typeof val === "object" && val !== null) {
+      parts.push(entryToText(val));
     }
   }
   return parts.join(" \n").trim();
 }
 
+// 🟢 Sanitize metadata to Pinecone-accepted types
+// Pinecone supports string, number, boolean, or list of strings.
+function sanitizeMetadata(obj: Record<string, any>): Record<string, string | number | boolean | string[]> {
+  const out: Record<string, string | number | boolean | string[]> = {};
+  for (const [k, v] of Object.entries(obj || {})) {
+    if (v === null || v === undefined) continue;
+    const t = typeof v;
+    if (t === "string" || t === "number" || t === "boolean") {
+      out[k] = v as any;
+      continue;
+    }
+    if (Array.isArray(v)) {
+      // Ensure list of strings only
+      const arr = v.map((item) => (typeof item === "string" ? item : JSON.stringify(item)));
+      out[k] = arr;
+      continue;
+    }
+    // Objects: store as JSON string to comply
+    try {
+      out[k] = JSON.stringify(v);
+    } catch {
+      // Fallback to toString if serialization fails
+      out[k] = String(v);
+    }
+  }
+  return out;
+}
+
+// 🟢 Resolve correct Management API host based on region (NA/EU)
+function getManagementHost(): string {
+  const override = process.env.NEXT_PUBLIC_CONTENTSTACK_MANAGEMENT_HOST;
+  if (override) return override;
+
+  const region = (process.env.NEXT_PUBLIC_CONTENTSTACK_REGION || "NA").toUpperCase();
+  // NA default: api.contentstack.io, EU: eu-api.contentstack.com
+  return region === "EU" ? "eu-api.contentstack.com" : "api.contentstack.io";
+}
+
+// 🟢 Fetch all content types dynamically via Management API
+async function getContentTypes(): Promise<string[]> {
+  const apiKey = stack.config.apiKey;
+  const mgmtToken = process.env.CONTENTSTACK_MANAGEMENT_TOKEN as string | undefined;
+  if (!apiKey) throw new Error("Missing NEXT_PUBLIC_CONTENTSTACK_API_KEY");
+  if (!mgmtToken) throw new Error("Missing CONTENTSTACK_MANAGEMENT_TOKEN in env");
+
+  const host = getManagementHost();
+  const url = `https://${host}/v3/content_types`;
+
+  const res = await fetch(url, {
+    headers: {
+      api_key: apiKey,
+      authorization: mgmtToken,
+    },
+    // Avoid any CDN caching issues
+    cache: "no-store",
+  });
+
+  if (!res.ok) {
+    const text = await res.text().catch(() => "");
+    throw new Error(`Failed to list content types (${res.status}): ${text || res.statusText}`);
+  }
+
+  const json = await res.json();
+  const types = json.content_types?.map((ct: any) => ct.uid) || [];
+  return types;
+}
+
+
+// 🟢 Main reindex function
 async function reindexAll() {
-  // 1) Fetch all pages from Contentstack (published entries in current env)
-  const res = await stack.contentType("page").entry().query().find<Page>();
-  const pages: Page[] = (res as any)?.entries || [];
+  const types = await getContentTypes(); // auto-discover content types
+  let total = 0;
 
-  // 2) Build embeddings
-  const records: { id: string; values: number[]; metadata?: Record<string, any> }[] = [];
-  for (const page of pages) {
-    if (!page?.uid) continue;
-    const text = pageToText(page);
-    if (!text) continue;
-    const vector = await getEmbedding(text);
-    records.push({
-      id: page.uid,
-      values: vector,
-      metadata: {
-        title: page.title,
-        description: page.description,
-        body: page.rich_text,
-        url: page.url,
-      },
-    });
+  for (const type of types) {
+    const res = await stack.contentType(type).entry().query().find<any>();
+    const entries: any[] = (res as any)?.entries || [];
+
+    const records = [];
+    for (const entry of entries) {
+      if (!entry?.uid) continue;
+      const text = entryToText(entry);
+      if (!text) continue;
+      const vector = await getEmbedding(text);
+      records.push({
+        id: `${type}_${entry.uid}`, // include type to avoid collisions
+        values: vector,
+        metadata: sanitizeMetadata({
+          type,
+          ...entry,
+        }),
+      });
+    }
+
+    if (records.length > 0) {
+      await index.upsert(records as any);
+      total += records.length;
+    }
   }
 
-  // 3) Upsert into Pinecone (SDK v6 expects an array of vectors)
-  if (records.length > 0) {
-    await index.upsert(records as any);
-  }
-
-  return { indexed: records.length };
+  return { indexed: total };
 }
 
 export async function POST(_req: NextRequest) {
@@ -61,19 +133,10 @@ export async function POST(_req: NextRequest) {
     return NextResponse.json({ ok: true, indexed });
   } catch (err: any) {
     console.error("Reindex error:", err);
-    const msg = err?.message || String(err);
-    return NextResponse.json({ ok: false, error: msg }, { status: 500 });
+    return NextResponse.json({ ok: false, error: err.message }, { status: 500 });
   }
 }
 
-// Support GET so visiting /api/reindex in a browser works
 export async function GET() {
-  try {
-    const { indexed } = await reindexAll();
-    return NextResponse.json({ ok: true, indexed });
-  } catch (err: any) {
-    console.error("Reindex error:", err);
-    const msg = err?.message || String(err);
-    return NextResponse.json({ ok: false, error: msg }, { status: 500 });
-  }
+  return POST(null as any); // same behavior for browser GET
 }
