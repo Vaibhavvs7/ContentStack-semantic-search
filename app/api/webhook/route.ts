@@ -1,6 +1,8 @@
 // app/api/webhook/route.ts
 import { getEmbedding } from '@/lib/embeddings';
 import { upsert, remove, persistStore } from '@/lib/vectorStore';
+import { index } from '@/lib/pinecone';
+import { entryToText, extractMetadata, sanitizeMetadata } from '@/lib/text';
 import crypto from 'crypto';
 
 export async function POST(req: Request) {
@@ -22,7 +24,7 @@ export async function POST(req: Request) {
 
     const contentType = String(entry?.content_type?.uid || entry?.content_type_uid || 'entry');
     const locale = String(entry?.locale || 'en-us');
-    const text = `${entry.title || ''}\n\n${entry.body || entry.description || ''}`.trim();
+    const text = entryToText(entry);
     const embedding = await getEmbedding(text || entry.title || '');
 
     upsert({
@@ -34,12 +36,45 @@ export async function POST(req: Request) {
       metadata: { entry },
     } as any);
     persistStore();
+
+    // Upsert into Pinecone as well (use namespace if configured)
+    const targetIndex: any = process.env.PINECONE_NAMESPACE
+      ? (index as any).namespace(process.env.PINECONE_NAMESPACE)
+      : index;
+    const { title, description, url } = extractMetadata(entry, contentType);
+    await targetIndex.upsert([
+      {
+        id: `${contentType}_${id}`,
+        values: embedding,
+        metadata: sanitizeMetadata({
+          ...entry,
+          type: contentType,
+          uid: id,
+          url,
+          title,
+          description,
+        }),
+      },
+    ] as any);
     return new Response(JSON.stringify({ ok: true }), { status: 200 });
   }
 
   if (payload?.data?.type === 'entry_unpublished' || event === 'entry.delete') {
   const id = payload?.data?.entry_uid || payload?.entry?.uid || payload?.data?.uid;
   if (id) remove(String(id));
+    // Optionally remove from Pinecone (if using namespaces)
+    try {
+      const contentType = String(payload?.data?.content_type_uid || payload?.entry?.content_type?.uid || 'entry');
+      const targetIndex: any = process.env.PINECONE_NAMESPACE
+        ? (index as any).namespace(process.env.PINECONE_NAMESPACE)
+        : index;
+      const pineId = `${contentType}_${id}`;
+      if (typeof targetIndex.deleteMany === 'function') {
+        await targetIndex.deleteMany([pineId]);
+      } else if (typeof targetIndex.deleteOne === 'function') {
+        await targetIndex.deleteOne(pineId);
+      }
+    } catch {}
     persistStore();
     return new Response(JSON.stringify({ ok: true }), { status: 200 });
   }

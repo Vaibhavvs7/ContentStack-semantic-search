@@ -2,68 +2,22 @@ import { NextRequest, NextResponse } from "next/server";
 import { stack } from "@/lib/contentstack";
 import { getEmbedding } from "@/lib/embeddings";
 import { index } from "@/lib/pinecone";
-import type { Page } from "@/lib/types";
+import { entryToText, extractMetadata, sanitizeMetadata } from "@/lib/text";
 
 export const runtime = "nodejs";
 
-// 🟢 Utility: Build clean text for embedding
-function entryToText(entry: any): string {
-  const parts: string[] = [];
-  for (const key of Object.keys(entry)) {
-    const val = entry[key];
-    if (typeof val === "string") parts.push(val);
-    if (Array.isArray(val)) {
-      for (const item of val) {
-        if (typeof item === "string") parts.push(item);
-        if (typeof item === "object") parts.push(entryToText(item));
-      }
-    }
-    if (typeof val === "object" && val !== null) {
-      parts.push(entryToText(val));
-    }
-  }
-  return parts.join(" \n").trim();
-}
+// Moved helpers to '@/lib/text'
 
-// 🟢 Sanitize metadata to Pinecone-accepted types
-// Pinecone supports string, number, boolean, or list of strings.
-function sanitizeMetadata(obj: Record<string, any>): Record<string, string | number | boolean | string[]> {
-  const out: Record<string, string | number | boolean | string[]> = {};
-  for (const [k, v] of Object.entries(obj || {})) {
-    if (v === null || v === undefined) continue;
-    const t = typeof v;
-    if (t === "string" || t === "number" || t === "boolean") {
-      out[k] = v as any;
-      continue;
-    }
-    if (Array.isArray(v)) {
-      // Ensure list of strings only
-      const arr = v.map((item) => (typeof item === "string" ? item : JSON.stringify(item)));
-      out[k] = arr;
-      continue;
-    }
-    // Objects: store as JSON string to comply
-    try {
-      out[k] = JSON.stringify(v);
-    } catch {
-      // Fallback to toString if serialization fails
-      out[k] = String(v);
-    }
-  }
-  return out;
-}
-
-// 🟢 Resolve correct Management API host based on region (NA/EU)
+// 🟢 Resolve correct Management API host based on region
 function getManagementHost(): string {
   const override = process.env.NEXT_PUBLIC_CONTENTSTACK_MANAGEMENT_HOST;
   if (override) return override;
 
   const region = (process.env.NEXT_PUBLIC_CONTENTSTACK_REGION || "NA").toUpperCase();
-  // NA default: api.contentstack.io, EU: eu-api.contentstack.com
   return region === "EU" ? "eu-api.contentstack.com" : "api.contentstack.io";
 }
 
-// 🟢 Fetch all content types dynamically via Management API
+// 🟢 Fetch all content types dynamically
 async function getContentTypes(): Promise<string[]> {
   const apiKey = stack.config.apiKey;
   const mgmtToken = process.env.CONTENTSTACK_MANAGEMENT_TOKEN as string | undefined;
@@ -78,7 +32,6 @@ async function getContentTypes(): Promise<string[]> {
       api_key: apiKey,
       authorization: mgmtToken,
     },
-    // Avoid any CDN caching issues
     cache: "no-store",
   });
 
@@ -88,38 +41,66 @@ async function getContentTypes(): Promise<string[]> {
   }
 
   const json = await res.json();
-  const types = json.content_types?.map((ct: any) => ct.uid) || [];
-  return types;
+  return json.content_types?.map((ct: any) => ct.uid) || [];
 }
-
 
 // 🟢 Main reindex function
 async function reindexAll() {
-  const types = await getContentTypes(); // auto-discover content types
+  const types = await getContentTypes();
   let total = 0;
 
+  // Respect optional Pinecone namespace via env for isolation (e.g., per env or tenant)
+  const targetIndex: any = process.env.PINECONE_NAMESPACE
+    ? (index as any).namespace(process.env.PINECONE_NAMESPACE)
+    : index;
+
   for (const type of types) {
-    const res = await stack.contentType(type).entry().query().find<any>();
-    const entries: any[] = (res as any)?.entries || [];
+    // Paginate through entries to ensure all items are indexed
+    const entries: any[] = [];
+    let skip = 0;
+    const limit = 100;
+    while (true) {
+      const res = await stack
+        .contentType(type)
+        .entry()
+        .query()
+        .skip(skip)
+        .limit(limit)
+        .find<any>();
+      const batch: any[] = (res as any)?.entries || [];
+      if (batch.length === 0) break;
+      entries.push(...batch);
+      if (batch.length < limit) break;
+      skip += limit;
+    }
 
     const records = [];
     for (const entry of entries) {
       if (!entry?.uid) continue;
       const text = entryToText(entry);
       if (!text) continue;
+
       const vector = await getEmbedding(text);
+      const { title, description, url } = extractMetadata(entry, type);
+
       records.push({
-        id: `${type}_${entry.uid}`, // include type to avoid collisions
+        id: `${type}_${entry.uid}`,
         values: vector,
         metadata: sanitizeMetadata({
-          type,
+          // spread original entry first, so canonical fields override
           ...entry,
+          type,
+          uid: entry.uid,
+          url,
+          title,
+          description,
         }),
       });
+
     }
 
     if (records.length > 0) {
-      await index.upsert(records as any);
+      await targetIndex.upsert(records as any);
       total += records.length;
     }
   }
@@ -138,5 +119,5 @@ export async function POST(_req: NextRequest) {
 }
 
 export async function GET() {
-  return POST(null as any); // same behavior for browser GET
+  return POST(null as any);
 }
