@@ -185,13 +185,30 @@ export default function Home() {
 
           {/* Search form */}
           <form onSubmit={handleSearch} className="flex gap-3">
-            <input
-              type="text"
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              placeholder="Search entries, e.g. 'DataSync' or 'Charlie Kirk assassination'..."
-              className="flex-1 rounded border px-4 py-3 shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-300"
-            />
+            <div className="relative flex-1">
+              <input
+                type="text"
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                placeholder="Search entries (e.g. DataSync, Kickstart, etc.)"
+                className="w-full rounded border pl-4 pr-10 py-3 shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-300"
+                aria-label="Search entries"
+              />
+              {query && (
+                <button
+                  type="button"
+                  aria-label="Clear search"
+                  onClick={() => {
+                  setQuery("");
+                  setResults([]);
+                  setError(null);
+                  }}
+                  className="absolute inset-y-0 right-2 flex items-center px-2 text-gray-800 hover:text-gray-600 focus:outline-none text-2xl"
+                >
+                  ×
+                </button>
+              )}
+            </div>
             <button
               type="submit"
               disabled={loading}
