@@ -10,6 +10,10 @@ type NumArray = number[];
  */
 export async function getEmbedding(text: string): Promise<NumArray> {
   const provider = (process.env.EMBEDDING_PROVIDER || "openai").toLowerCase();
+  if (process.env.NODE_ENV !== "production") {
+    // Temporary debug logging – remove after verifying correct provider & dimensions
+    console.log("[embeddings] provider=", provider);
+  }
 
   // Local embedding server
   if (provider === "local") {
@@ -41,7 +45,11 @@ export async function getEmbedding(text: string): Promise<NumArray> {
     });
     const js = await res.json();
     if (!res.ok) throw new Error(`OpenAI embed error: ${JSON.stringify(js)}`);
-    return js.data[0].embedding as number[];
+    const emb = js.data[0].embedding as number[];
+    if (process.env.NODE_ENV !== "production") {
+      console.log("[embeddings] openai length=", emb.length, "model=", model);
+    }
+    return emb;
   }
 
   // Gemini embeddings
@@ -66,8 +74,33 @@ export async function getEmbedding(text: string): Promise<NumArray> {
     if (!res.ok) throw new Error(`Gemini embed error: ${JSON.stringify(js)}`);
 
     // Response shape: { embedding: { values: number[] } }
-    const values = js?.embedding?.values as number[] | undefined;
+    let values = js?.embedding?.values as number[] | undefined;
     if (!Array.isArray(values)) throw new Error("Gemini embed error: missing embedding values");
+    const expected = parseInt(process.env.VECTOR_STORE_DIM || "", 10);
+    if (expected && values.length !== expected) {
+      const got = values.length;
+      const multiple = got % expected === 0;
+      console.warn(
+        `[embeddings] gemini dimension mismatch: got ${got} expected ${expected}.` +
+          (multiple ? " Will reduce by block-wise mean pooling." : " (no safe reduction rule).")
+      );
+      // If larger vector is an integer multiple, compress via average pooling (better than naive slice)
+      if (multiple && got > expected) {
+        const factor = got / expected; // e.g. 3072 / 768 = 4
+        const reduced: number[] = new Array(expected).fill(0);
+        for (let i = 0; i < expected; i++) {
+          let acc = 0;
+            for (let j = 0; j < factor; j++) {
+              acc += values[i * factor + j];
+            }
+          reduced[i] = acc / factor;
+        }
+        values = reduced;
+      }
+    }
+    if (process.env.NODE_ENV !== "production") {
+      console.log("[embeddings] gemini length=", values.length, "model=", model);
+    }
     return values;
   }
 
