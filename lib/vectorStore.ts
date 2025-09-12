@@ -1,6 +1,5 @@
 // lib/vectorStore.ts
 import fs from "fs";
-import path from "path";
 
 export interface VectorEntry {
   id: string;             // unique id, e.g. entry uid

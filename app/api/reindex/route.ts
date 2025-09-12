@@ -108,7 +108,7 @@ async function reindexAll() {
   return { indexed: total };
 }
 
-export async function POST(_req: NextRequest) {
+export async function POST() {
   try {
     const { indexed } = await reindexAll();
     return NextResponse.json({ ok: true, indexed });
@@ -119,5 +119,11 @@ export async function POST(_req: NextRequest) {
 }
 
 export async function GET() {
-  return POST(null as any);
+  try {
+    const { indexed } = await reindexAll();
+    return NextResponse.json({ ok: true, indexed });
+  } catch (err: any) {
+    console.error("Reindex error (GET):", err);
+    return NextResponse.json({ ok: false, error: err.message }, { status: 500 });
+  }
 }

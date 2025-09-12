@@ -9,7 +9,7 @@ type NumArray = number[];
  * Return an embedding for a single piece of text
  */
 export async function getEmbedding(text: string): Promise<NumArray> {
-  const provider = (process.env.EMBEDDING_PROVIDER || "openai").toLowerCase();
+  const provider = (process.env.EMBEDDING_PROVIDER || "openai").toLowerCase(); // provider referenced below to choose implementation
   if (process.env.NODE_ENV !== "production") {
     // Temporary debug logging – remove after verifying correct provider & dimensions
     console.log("[embeddings] provider=", provider);

@@ -32,7 +32,8 @@ export default function Home() {
       setResults([]);
       setError(null);
     }
-  }, [query]);
+    // include results.length for exhaustive-deps correctness (only its primitive length used)
+  }, [query, results.length]);
 
   const getContent = async () => {
     const page = await getPage("/");
@@ -325,7 +326,7 @@ export default function Home() {
             <div className="bg-white border rounded p-4 shadow-sm">
               <h3 className="text-sm font-semibold mb-2">Search tips</h3>
               <ul className="text-sm text-gray-600 list-disc pl-5 space-y-2">
-                <li>Try natural language queries (e.g. "DataSync to local DB").</li>
+                <li>Try natural language queries (e.g. &quot;DataSync to local DB&quot;).</li>
                 <li>Use content-type filter to narrow results.</li>
                 <li>Click <em>Open</em> to view the original entry in a new tab.</li>
               </ul>
@@ -336,7 +337,7 @@ export default function Home() {
               <ul className="text-sm text-gray-600 list-disc pl-5 space-y-2">
                 <li>Realtime auto-indexing (webhook) — updates appear instantly.</li>
                 <li>Highlight matched terms in results (already enabled).</li>
-                <li>Show filters for locale & publish date.</li>
+                <li>Show filters for locale &amp; publish date.</li>
               </ul>
             </div>
           </aside>
