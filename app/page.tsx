@@ -1,20 +1,16 @@
 "use client";
 
+import CSlogo from "./CSlogo.webp";
 import DOMPurify from "dompurify";
 import Image from "next/image";
 import Link from "next/link";
 import { getPage, initLivePreview } from "@/lib/contentstack";
 import { useEffect, useMemo, useState } from "react";
 import { Page } from "@/lib/types";
-import ContentstackLivePreview, {
-  VB_EmptyBlockParentClass,
-} from "@contentstack/live-preview-utils";
+import ContentstackLivePreview from "@contentstack/live-preview-utils";
 
 /**
- * Semantic Search UI — Contentstack style
- * - Search bar + suggestion chips
- * - Filter by content type
- * - Table-like result list with columns: Title | Content Type | Snippet | Score | Actions
+ * Semantic Search UI
  */
 
 export default function Home() {
@@ -26,13 +22,11 @@ export default function Home() {
   const [selectedType, setSelectedType] = useState<string>("all");
   const [allContentTypes, setAllContentTypes] = useState<string[]>([]);
 
-  // Clear results immediately when query field is emptied (without needing submit)
   useEffect(() => {
     if (query.trim() === "" && results.length > 0) {
       setResults([]);
       setError(null);
     }
-    // include results.length for exhaustive-deps correctness (only its primitive length used)
   }, [query, results.length]);
 
   const getContent = async () => {
@@ -43,16 +37,15 @@ export default function Home() {
   useEffect(() => {
     initLivePreview();
     ContentstackLivePreview.onEntryChange(getContent);
-    // initial fetch for page content + content types
     getContent();
     (async () => {
       try {
-        const res = await fetch('/api/content-types');
+        const res = await fetch("/api/content-types");
         const data = await res.json();
-        if (data.ok) {
-          setAllContentTypes(['all', ...data.contentTypes]);
-        }
-      } catch {/* ignore */}
+        if (data.ok) setAllContentTypes(["all", ...data.contentTypes]);
+      } catch {
+        /* ignore */
+      }
     })();
   }, []);
 
@@ -60,26 +53,21 @@ export default function Home() {
     if (e) e.preventDefault();
     const searchTerm = (overrideQuery ?? query).trim();
     if (!searchTerm) {
-      // Clear results if query cleared
       setResults([]);
       return;
     }
     setLoading(true);
     setError(null);
     try {
-      // Always search across ALL content types server-side; we filter locally via dropdown.
       const res = await fetch("/api/search", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ query: searchTerm }),
       });
-      if (!res.ok) {
-        throw new Error(`HTTP ${res.status}`);
-      }
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json();
-      if (data.ok) {
-        setResults(Array.isArray(data.results) ? data.results : []);
-      } else {
+      if (data.ok) setResults(Array.isArray(data.results) ? data.results : []);
+      else {
         setError(data.error || "Something went wrong");
         setResults([]);
       }
@@ -91,8 +79,6 @@ export default function Home() {
     }
   }
 
-  // derive content-type list from results for filtering dropdown
-  // When we have an authoritative list from API, prefer it; fallback to deriving from current results.
   const contentTypes = useMemo(() => {
     if (allContentTypes.length > 0) return allContentTypes;
     const set = new Set<string>();
@@ -103,41 +89,34 @@ export default function Home() {
     return ["all", ...Array.from(set)];
   }, [results, allContentTypes]);
 
-  // helper to show best snippet from metadata
   function getSnippet(r: any, q: string) {
     const meta = r.metadata || {};
     const candidates: string[] = [];
     if (meta.description) candidates.push(String(meta.description));
     if (meta.summary) candidates.push(String(meta.summary));
     if (meta.body) candidates.push(String(meta.body));
-    if (meta.rich_text || meta.rich_text_editor) {
+    if (meta.rich_text || meta.rich_text_editor)
       candidates.push(String(meta.rich_text || meta.rich_text_editor));
-    }
-    // fallback to any text-like metadata fields (avoid duplicates)
     for (const k of Object.keys(meta)) {
       const v = meta[k];
-      if (typeof v === "string" && v.length > 30 && !candidates.includes(v)) candidates.push(v);
+      if (typeof v === "string" && v.length > 30 && !candidates.includes(v))
+        candidates.push(v);
     }
     if (candidates.length === 0) return "";
     if (q) {
       const tokens = q.toLowerCase().split(/\s+/).filter(Boolean);
-      // Find first candidate containing any token; otherwise fallback
-      const found = candidates.find(c => {
+      const found = candidates.find((c) => {
         const lc = c.toLowerCase();
-        return tokens.some(t => lc.includes(t));
+        return tokens.some((t) => lc.includes(t));
       });
-      if (found) {
-        return found.replace(/\s+/g, " ").slice(0, 280);
-      }
+      if (found) return found.replace(/\s+/g, " ").slice(0, 280);
     }
     return candidates[0].replace(/\s+/g, " ").slice(0, 280);
   }
 
-  // optional lightweight highlight (bold matched terms) — safe HTML sanitized later
   function highlight(text: string, q: string) {
     if (!text || !q) return text;
     try {
-      // build regex from query tokens
       const tokens = q
         .split(/\s+/)
         .filter(Boolean)
@@ -150,14 +129,12 @@ export default function Home() {
     }
   }
 
-  // filtered results by type
   const shownResults = results.filter((r) => {
     if (selectedType === "all") return true;
     const t = (r.metadata && r.metadata.type) || "unknown";
     return t === selectedType;
   });
 
-  // suggestion chips
   const suggestions = [
     "DataSync",
     "Composable Commerce",
@@ -167,22 +144,83 @@ export default function Home() {
 
   return (
     <main className="min-h-screen bg-neutral-50">
-      <div className="mx-auto max-w-7xl px-6 py-8">
-        {/* Header / Search area */}
+      {/* Fixed Sidebar */}
+      <aside className="hidden lg:flex fixed inset-y-0 left-0 w-60 flex-col bg-white border-r border-neutral-200 shadow-sm z-20">
+        <div className="flex items-center gap-2 px-5 py-5 border-b border-neutral-100">
+          {/* Place CSlogo.webp inside /public folder */}
+            <Image
+              src={CSlogo}
+              alt="Contentstack Logo"
+              width={32}
+              height={32}
+              className="w-8 h-8"
+              priority
+            />
+          <span className="text-lg font-bold text-[#882de3] tracking-tight">
+            Contentstack
+          </span>
+        </div>
+        <div className="flex-1 overflow-y-auto pt-5 pb-6">
+          <div className="text-[11px] font-semibold tracking-wide text-neutral-500 mb-2 px-5">
+            CONTENT TYPES
+          </div>
+          <ul className="space-y-1 px-3">
+            {contentTypes.map((t) => {
+              const active = selectedType === t;
+              return (
+                <li key={t}>
+                  <button
+                    type="button"
+                    onClick={() => setSelectedType(t)}
+                    className={`w-full text-left px-3 py-2 rounded-md text-sm font-medium transition-colors border ${
+                      active
+                        ? "bg-[#882de3] border-[#882de3] text-white shadow"
+                        : "bg-white border-neutral-200 text-neutral-700 hover:bg-neutral-100"
+                    }`}
+                  >
+                    {t === "all" ? "All Types" : t}
+                  </button>
+                </li>
+              );
+            })}
+          </ul>
+          <div className="mt-6 px-5">
+            <div className="rounded-md bg-white border border-neutral-200 px-3 py-2">
+              <div className="text-[10px] uppercase tracking-wide text-neutral-400 font-medium">
+                Powered by
+              </div>
+              <div className="text-xs font-semibold text-neutral-600">
+                semantic search
+              </div>
+            </div>
+          </div>
+        </div>
+      </aside>
+
+      {/* Main Content (shifted for sidebar on large screens) */}
+      <div className="lg:ml-60 px-6 py-8 max-w-7xl mx-auto">
+        {/* Search Header */}
         <div className="rounded-lg border border-neutral-200 bg-white/60 backdrop-blur-sm shadow-sm p-6 mb-6">
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-3">
               <div className="text-2xl">🔍</div>
               <div>
-                <h1 className="text-xl font-semibold tracking-tight text-gray-800">Semantic Search</h1>
-                <div className="text-sm text-gray-500 mt-0.5">Search across your Contentstack entries (semantic / embeddings)</div>
+                <h1 className="text-xl font-semibold tracking-tight text-gray-800">
+                  Semantic Search
+                </h1>
+                <div className="text-sm text-gray-500 mt-0.5">
+                  Search across your Contentstack entries (semantic / embeddings)
+                </div>
               </div>
             </div>
-
-            <div className="text-sm text-gray-600">Stack: <strong className="font-semibold text-gray-700">ContentStackExplorer</strong></div>
+            <div className="text-sm text-gray-600">
+              Stack:{" "}
+              <strong className="font-semibold text-gray-700">
+                ContentStackExplorer
+              </strong>
+            </div>
           </div>
 
-          {/* Search form */}
           <form onSubmit={handleSearch} className="flex gap-3">
             <div className="relative flex-1 group">
               <input
@@ -198,9 +236,9 @@ export default function Home() {
                   type="button"
                   aria-label="Clear search"
                   onClick={() => {
-                  setQuery("");
-                  setResults([]);
-                  setError(null);
+                    setQuery("");
+                    setResults([]);
+                    setError(null);
                   }}
                   className="absolute inset-y-0 right-1.5 flex items-center px-2 text-gray-500 hover:text-gray-700 focus:outline-none text-2xl"
                 >
@@ -211,59 +249,60 @@ export default function Home() {
             <button
               type="submit"
               disabled={loading}
-              className="bg-sky-600 hover:bg-sky-700 active:bg-sky-800 disabled:opacity-60 disabled:hover:bg-sky-600 text-white px-5 py-3 rounded-md font-medium shadow-sm focus:outline-none focus:ring-2 focus:ring-sky-400 focus:ring-offset-1 focus:ring-offset-white"
+              className="bg-[#882de3] hover:bg-[#6f23b6] active:bg-[#5a1c93] disabled:opacity-60 disabled:hover:bg-[#882de3] text-white px-5 py-3 rounded-md font-medium shadow-sm focus:outline-none focus:ring-2 focus:ring-[#882de3] focus:ring-offset-1 focus:ring-offset-white"
             >
               {loading ? "Searching..." : "Search"}
             </button>
           </form>
 
-          {/* suggestion chips */}
-          <div className="mt-4 flex flex-wrap gap-2">
-            {suggestions.map((s) => (
-              <button
-                key={s}
-                onClick={() => {
-                  setQuery(s);
-                  void handleSearch(undefined, s);
-                }}
-                className="text-sm bg-indigo-50 text-indigo-700 px-3 py-1 rounded border border-indigo-100 hover:bg-indigo-100"
-              >
-                {s}
-              </button>
-            ))}
-          </div>
-          {/* Error banner */}
-          {error && (
-            <div className="mt-4 rounded-md border border-red-300 bg-red-50 px-4 py-3 text-sm text-red-700 flex items-start gap-3">
-              <span className="mt-0.5">⚠️</span>
-              <div className="flex-1">
-                <strong className="font-semibold">Error:</strong> {error}
+            <div className="mt-4 flex flex-wrap gap-2">
+              {suggestions.map((s) => (
                 <button
-                  onClick={() => setError(null)}
-                  className="ml-3 underline hover:no-underline"
+                  key={s}
+                  onClick={() => {
+                    setQuery(s);
+                    void handleSearch(undefined, s);
+                  }}
+                  className="text-sm bg-indigo-50 text-indigo-700 px-3 py-1 rounded border border-indigo-100 hover:bg-indigo-100"
                 >
-                  Dismiss
+                  {s}
                 </button>
-              </div>
+              ))}
             </div>
-          )}
+
+            {error && (
+              <div className="mt-4 rounded-md border border-red-300 bg-red-50 px-4 py-3 text-sm text-red-700 flex items-start gap-3">
+                <span className="mt-0.5">⚠️</span>
+                <div className="flex-1">
+                  <strong className="font-semibold">Error:</strong> {error}
+                  <button
+                    onClick={() => setError(null)}
+                    className="ml-3 underline hover:no-underline"
+                  >
+                    Dismiss
+                  </button>
+                </div>
+              </div>
+            )}
         </div>
 
-        {/* Main content area — results table + (optional) right column */}
+        {/* Results + Right Panels */}
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-          {/* Left: results table (takes most space) */}
           <div className="lg:col-span-9">
-            {/* Toolbar */}
+            {/* Mobile filter */}
             <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-3 gap-3">
-              <div className="flex items-center gap-3">
-                <label htmlFor="contentTypeFilter" className="text-xs uppercase tracking-wide font-medium text-neutral-600">Filter</label>
+              <div className="flex items-center gap-3 lg:hidden">
+                <label
+                  htmlFor="contentTypeFilter"
+                  className="text-xs uppercase tracking-wide font-medium text-neutral-600"
+                >
+                  Filter
+                </label>
                 <div className="relative">
                   <select
                     id="contentTypeFilter"
                     value={selectedType}
-                    onChange={(e) => {
-                      setSelectedType(e.target.value);
-                    }}
+                    onChange={(e) => setSelectedType(e.target.value)}
                     className="appearance-none text-sm rounded-md border border-neutral-300 bg-white/70 backdrop-blur px-3 pr-9 py-1.5 shadow-sm focus:outline-none focus:ring-2 focus:ring-sky-400 focus:border-sky-400 text-neutral-700"
                   >
                     {contentTypes.map((t) => (
@@ -272,22 +311,30 @@ export default function Home() {
                       </option>
                     ))}
                   </select>
-                  <span className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-neutral-400 text-xs">▾</span>
+                  <span className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-neutral-400 text-xs">
+                    ▾
+                  </span>
                 </div>
-                {selectedType !== 'all' && (
+                {selectedType !== "all" && (
                   <button
-                    onClick={() => setSelectedType('all')}
+                    onClick={() => setSelectedType("all")}
                     className="text-xs font-medium text-sky-600 hover:text-sky-700 underline decoration-dotted"
-                  >Reset</button>
+                  >
+                    Reset
+                  </button>
                 )}
               </div>
 
               <div className="text-sm text-neutral-500 font-medium">
-                {loading ? "Searching..." : `${shownResults.length} result${shownResults.length === 1 ? '' : 's'}`}
+                {loading
+                  ? "Searching..."
+                  : `${shownResults.length} result${
+                      shownResults.length === 1 ? "" : "s"
+                    }`}
               </div>
             </div>
 
-            {/* Table header (desktop) */}
+            {/* Desktop header */}
             <div className="hidden md:flex bg-neutral-100 px-4 py-2 rounded-t text-[11px] uppercase tracking-wide text-neutral-600 font-medium border border-neutral-200">
               <div className="w-1/3">Title</div>
               <div className="w-1/6">Content Type</div>
@@ -295,40 +342,42 @@ export default function Home() {
               <div className="w-24 text-right">Score</div>
             </div>
 
-            {/* Results list (desktop table) */}
+            {/* Desktop results */}
             <div className="hidden md:block bg-white border border-neutral-200 rounded-b divide-y divide-neutral-100">
               {shownResults.length === 0 && !loading && query && (
-                <div className="p-6 text-gray-600">No results found for <strong>{query}</strong>.</div>
+                <div className="p-6 text-gray-600">
+                  No results found for <strong>{query}</strong>.
+                </div>
               )}
 
-              {/* Loading skeletons */}
-              {loading && (
-                <>
-                  {Array.from({ length: 5 }).map((_, idx) => (
-                    <div key={idx} className="flex flex-col md:flex-row items-start md:items-center px-4 py-4 gap-3 animate-pulse">
-                      <div className="md:w-1/3 w-full space-y-2">
-                        <div className="h-4 bg-neutral-200 rounded" />
-                        <div className="h-3 bg-neutral-100 rounded w-2/3 hidden md:block" />
-                      </div>
-                      <div className="md:w-1/6 h-4 bg-neutral-100 rounded w-24" />
-                      <div className="md:w-1/2 w-full space-y-2">
-                        <div className="h-3 bg-neutral-100 rounded" />
-                        <div className="h-3 bg-neutral-100 rounded w-5/6" />
-                        <div className="h-3 bg-neutral-100 rounded w-2/3" />
-                      </div>
-                      <div className="md:w-24 w-16 h-4 bg-neutral-100 rounded self-stretch" />
+              {loading &&
+                Array.from({ length: 5 }).map((_, idx) => (
+                  <div
+                    key={idx}
+                    className="flex flex-col md:flex-row items-start md:items-center px-4 py-4 gap-3 animate-pulse"
+                  >
+                    <div className="md:w-1/3 w-full space-y-2">
+                      <div className="h-4 bg-neutral-200 rounded" />
+                      <div className="h-3 bg-neutral-100 rounded w-2/3 hidden md:block" />
                     </div>
-                  ))}
-                </>
-              )}
+                    <div className="md:w-1/6 h-4 bg-neutral-100 rounded w-24" />
+                    <div className="md:w-1/2 w-full space-y-2">
+                      <div className="h-3 bg-neutral-100 rounded" />
+                      <div className="h-3 bg-neutral-100 rounded w-5/6" />
+                      <div className="h-3 bg-neutral-100 rounded w-2/3" />
+                    </div>
+                    <div className="md:w-24 w-16 h-4 bg-neutral-100 rounded self-stretch" />
+                  </div>
+                ))}
 
               {shownResults.map((r, i) => {
                 const title = r.metadata?.title || "Untitled";
                 const type = r.metadata?.type || "unknown";
                 const url = r.metadata?.url || "#";
                 const rawSnippet = getSnippet(r, query);
-                const snippetHtml = DOMPurify.sanitize(highlight(rawSnippet, query));
-
+                const snippetHtml = DOMPurify.sanitize(
+                  highlight(rawSnippet, query)
+                );
                 const score = typeof r.score === "number" ? r.score : 0;
                 return (
                   <div
@@ -338,24 +387,31 @@ export default function Home() {
                     } hover:bg-sky-50/60`}
                   >
                     <div className="md:w-1/3">
-                      <Link href={url} className="text-sm font-medium text-gray-900 hover:underline">
+                      <Link
+                        href={url}
+                        className="text-sm font-medium text-gray-900 hover:underline"
+                      >
                         {title}
                       </Link>
                       <div className="text-xs text-gray-500 mt-1 hidden md:block">
                         UID: <code className="text-xs">{r.metadata?.uid || "-"}</code>
                       </div>
                     </div>
-
                     <div className="md:w-1/6 text-sm text-gray-600">{type}</div>
-
-                    <div className="md:w-1/2 text-sm text-gray-700 prose-sm" dangerouslySetInnerHTML={{ __html: snippetHtml }} />
-
+                    <div
+                      className="md:w-1/2 text-sm text-gray-700 prose-sm"
+                      dangerouslySetInnerHTML={{ __html: snippetHtml }}
+                    />
                     <div className="md:w-24 text-right text-xs text-gray-500 space-y-1">
-                      <div className="font-medium text-gray-700 text-[11px] tracking-wide">{(score * 100).toFixed(0)}%</div>
+                      <div className="font-medium text-gray-700 text-[11px] tracking-wide">
+                        {(score * 100).toFixed(0)}%
+                      </div>
                       <div className="h-2.5 rounded-full bg-neutral-200 overflow-hidden">
                         <div
                           className="h-full bg-gradient-to-r from-sky-500 to-indigo-500 transition-all duration-500"
-                          style={{ width: `${Math.min(100, Math.max(0, score * 100))}%` }}
+                          style={{
+                            width: `${Math.min(100, Math.max(0, score * 100))}%`,
+                          }}
                         />
                       </div>
                       <div className="pt-1">
@@ -379,7 +435,10 @@ export default function Home() {
               {loading && (
                 <div className="space-y-3">
                   {Array.from({ length: 4 }).map((_, i) => (
-                    <div key={i} className="rounded-lg border border-neutral-200 bg-white p-4 shadow-xs animate-pulse space-y-3">
+                    <div
+                      key={i}
+                      className="rounded-lg border border-neutral-200 bg-white p-4 shadow-xs animate-pulse space-y-3"
+                    >
                       <div className="h-4 bg-neutral-200 rounded w-2/3" />
                       <div className="h-3 bg-neutral-100 rounded w-1/3" />
                       <div className="h-3 bg-neutral-100 rounded" />
@@ -389,48 +448,87 @@ export default function Home() {
                 </div>
               )}
               {!loading && shownResults.length === 0 && query && (
-                <div className="rounded-md border border-neutral-200 bg-white p-4 text-sm text-neutral-600">No results found for <strong>{query}</strong>.</div>
+                <div className="rounded-md border border-neutral-200 bg-white p-4 text-sm text-neutral-600">
+                  No results found for <strong>{query}</strong>.
+                </div>
               )}
-              {!loading && shownResults.map((r, i) => {
-                const title = r.metadata?.title || 'Untitled';
-                const type = r.metadata?.type || 'unknown';
-                const url = r.metadata?.url || '#';
-                const rawSnippet = getSnippet(r, query);
-                const snippetHtml = DOMPurify.sanitize(highlight(rawSnippet, query));
-                const score = typeof r.score === 'number' ? r.score : 0;
-                return (
-                  <div key={r.id || i} className="rounded-lg border border-neutral-200 bg-white p-4 shadow-sm hover:border-sky-300 transition-colors">
-                    <div className="flex items-start justify-between gap-3">
-                      <div>
-                        <Link href={url} className="font-medium text-sm text-gray-900 hover:underline">{title}</Link>
-                        <div className="mt-1 text-[11px] uppercase tracking-wide text-neutral-500 font-medium">{type}</div>
-                      </div>
-                      <div className="text-right w-20">
-                        <div className="text-[11px] font-medium text-gray-700">{(score*100).toFixed(0)}%</div>
-                        <div className="h-2 rounded-full bg-neutral-200 overflow-hidden">
-                          <div className="h-full bg-sky-500" style={{width: `${Math.min(100, Math.max(0, score*100))}%`}} />
+              {!loading &&
+                shownResults.map((r, i) => {
+                  const title = r.metadata?.title || "Untitled";
+                  const type = r.metadata?.type || "unknown";
+                  const url = r.metadata?.url || "#";
+                  const rawSnippet = getSnippet(r, query);
+                  const snippetHtml = DOMPurify.sanitize(
+                    highlight(rawSnippet, query)
+                  );
+                  const score = typeof r.score === "number" ? r.score : 0;
+                  return (
+                    <div
+                      key={r.id || i}
+                      className="rounded-lg border border-neutral-200 bg-white p-4 shadow-sm hover:border-sky-300 transition-colors"
+                    >
+                      <div className="flex items-start justify-between gap-3">
+                        <div>
+                          <Link
+                            href={url}
+                            className="font-medium text-sm text-gray-900 hover:underline"
+                          >
+                            {title}
+                          </Link>
+                          <div className="mt-1 text-[11px] uppercase tracking-wide text-neutral-500 font-medium">
+                            {type}
+                          </div>
+                        </div>
+                        <div className="text-right w-20">
+                          <div className="text-[11px] font-medium text-gray-700">
+                            {(score * 100).toFixed(0)}%
+                          </div>
+                          <div className="h-2 rounded-full bg-neutral-200 overflow-hidden">
+                            <div
+                              className="h-full bg-sky-500"
+                              style={{
+                                width: `${Math.min(
+                                  100,
+                                  Math.max(0, score * 100)
+                                )}%`,
+                              }}
+                            />
+                          </div>
                         </div>
                       </div>
+                      <div
+                        className="mt-3 text-xs text-neutral-700 leading-relaxed"
+                        dangerouslySetInnerHTML={{ __html: snippetHtml }}
+                      />
+                      <div className="mt-3 flex items-center justify-between">
+                        <code className="text-[10px] bg-neutral-100 rounded px-1.5 py-0.5 text-neutral-500">
+                          {r.metadata?.uid || "-"}
+                        </code>
+                        <a
+                          href={url}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="text-[11px] font-medium text-sky-600 hover:text-sky-700 hover:underline"
+                        >
+                          Open
+                        </a>
+                      </div>
                     </div>
-                    <div className="mt-3 text-xs text-neutral-700 leading-relaxed" dangerouslySetInnerHTML={{__html: snippetHtml}} />
-                    <div className="mt-3 flex items-center justify-between">
-                      <code className="text-[10px] bg-neutral-100 rounded px-1.5 py-0.5 text-neutral-500">{r.metadata?.uid || '-'}</code>
-                      <a href={url} target="_blank" rel="noreferrer" className="text-[11px] font-medium text-sky-600 hover:text-sky-700 hover:underline">Open</a>
-                    </div>
-                  </div>
-                );
-              })}
+                  );
+                })}
             </div>
           </div>
 
-          {/* Right: Small info / preview panel (optional) */}
+          {/* Right info panels */}
           <aside className="lg:col-span-3">
             <div className="bg-white border rounded p-4 shadow-sm">
               <h3 className="text-sm font-semibold mb-2">Search tips</h3>
               <ul className="text-sm text-gray-600 list-disc pl-5 space-y-2">
-                <li>Try natural language queries (e.g. &quot;DataSync to local DB&quot;).</li>
+                <li>Try natural language queries (e.g. "DataSync to local DB").</li>
                 <li>Use content-type filter to narrow results.</li>
-                <li>Click <em>Open</em> to view the original entry in a new tab.</li>
+                <li>
+                  Click <em>Open</em> to view the original entry in a new tab.
+                </li>
               </ul>
             </div>
 
@@ -444,8 +542,6 @@ export default function Home() {
             </div>
           </aside>
         </div>
-
-        
       </div>
     </main>
   );
