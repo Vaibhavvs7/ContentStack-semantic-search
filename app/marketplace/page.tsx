@@ -1,7 +1,8 @@
 'use client';
 
+export const dynamic = 'force-dynamic';
+
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import ContentstackAppSDK from '@contentstack/app-sdk';
 
 interface CSAppInfo {
   stackName?: string;
@@ -9,51 +10,77 @@ interface CSAppInfo {
   userEmail?: string;
   stackUid?: string;
   orgUid?: string;
+  mock?: boolean;
 }
 
 type InitState = 'idle' | 'loading' | 'ready' | 'error';
 
 export default function MarketplaceAppPage() {
-  // Using 'any' for sdk due to incomplete/variant type definitions across UI locations.
   const [sdk, setSdk] = useState<any | null>(null);
   const [info, setInfo] = useState<CSAppInfo>({});
   const [state, setState] = useState<InitState>('idle');
   const [error, setError] = useState<string | null>(null);
-  const debug = typeof window !== 'undefined' && new URLSearchParams(window.location.search).has('debug');
+
+  const qs =
+    typeof window !== 'undefined' ? new URLSearchParams(window.location.search) : null;
+  const debug = !!qs?.get('debug');
+  const forceMock = !!qs?.get('mock');
+  const isEmbedded =
+    typeof window !== 'undefined' && window.parent && window.parent !== window;
 
   const init = useCallback(async () => {
     setState('loading');
+
+    // If not embedded (direct open) or ?mock present -> use mock
+    if (!isEmbedded || forceMock) {
+      setInfo({
+        stackName: '(mock stack)',
+        stackUid: 'mock_stack_uid',
+        organizationName: '(mock org)',
+        orgUid: 'mock_org_uid',
+        userEmail: 'user@example.com',
+        mock: true,
+      });
+      setSdk({
+        mock: true,
+        note: 'Running in mock mode (not inside Contentstack iframe).',
+      });
+      setState('ready');
+      return;
+    }
+
     try {
-  const instance: any = await ContentstackAppSDK.init();
-      // Auto-resize so the iframe grows with content (safe no-op if not present)
-  try { instance.frame?.startAutoResizer?.(); } catch { /* ignored */ }
+      const { default: ContentstackAppSDK } = await import('@contentstack/app-sdk');
+      const instance: any = await ContentstackAppSDK.init();
+
+      try {
+        instance.frame?.startAutoResizer?.();
+      } catch { /* ignore */ }
+
       setSdk(instance);
-      // Cast to any to safely access optional properties that may differ by location.
+
       const stack: any = instance.stack;
-      const org: any = instance.organization || stack?.organization; // fallback if nested
+      const org: any = instance.organization || stack?.organization;
       const user: any = instance.currentUser;
+
       setInfo({
         stackName: stack?.name,
         organizationName: org?.name,
         userEmail: user?.email,
         stackUid: stack?.uid,
         orgUid: org?.uid,
+        mock: false,
       });
+
       setState('ready');
     } catch (e: any) {
       setError(e?.message || 'Initialization failed');
       setState('error');
     }
-  }, []);
+  }, [isEmbedded, forceMock]);
 
   useEffect(() => {
-    let alive = true;
-    (async () => {
-      try {
-        await init();
-      } catch {/* handled in init */}
-    })();
-    return () => { alive = false; };
+    init();
   }, [init]);
 
   const content = useMemo(() => {
@@ -62,12 +89,25 @@ export default function MarketplaceAppPage() {
       case 'loading':
         return <Status type="loading" message="Initializing Contentstack App…" />;
       case 'error':
-        return <Status type="error" message={error || 'Unknown error'} onRetry={init} />;
+        return (
+          <Status
+            type="error"
+            message={error || 'Unknown error'}
+            onRetry={init}
+          />
+        );
       case 'ready':
         return (
           <div>
-            <h1 style={{ fontSize: 20, fontWeight: 600, marginBottom: 8 }}>✅ App Initialized</h1>
-            <p style={{ marginBottom: 16 }}>Your marketplace app iframe has successfully signaled readiness to Contentstack.</p>
+            <h1 style={{ fontSize: 20, fontWeight: 600, marginBottom: 8 }}>
+              ✅ App Initialized {info.mock && '(Mock Mode)'}
+            </h1>
+            {info.mock && (
+              <p style={{ margin: '4px 0 12px', color: '#aa6600', fontSize: 13 }}>
+                Not running inside Contentstack iframe. Real SDK mocked. Add this app
+                in Contentstack to test the true environment. (Use ?mock to force.)
+              </p>
+            )}
             <div style={{ display: 'grid', gap: 8, maxWidth: 520 }}>
               <Info label="Stack" value={info.stackName} />
               <Info label="Stack UID" value={info.stackUid} />
@@ -77,18 +117,38 @@ export default function MarketplaceAppPage() {
             </div>
             <hr style={{ margin: '24px 0' }} />
             <section>
-              <h2 style={{ fontSize: 16, fontWeight: 600, marginBottom: 8 }}>Next Steps</h2>
+              <h2 style={{ fontSize: 16, fontWeight: 600, marginBottom: 8 }}>
+                Next Steps
+              </h2>
               <ol style={{ paddingLeft: 20, fontSize: 14, lineHeight: 1.5 }}>
-                <li>Confirm this URL is set as your Installation (Full Page) URL in Developer Hub.</li>
-                <li>Remove or adapt this scaffold and build your UI.</li>
-                <li>Use <code>@contentstack/app-sdk</code> to read/write stack settings or interact with entries.</li>
-                <li>Add <code>?debug</code> to the URL for raw SDK data (local only recommended).</li>
+                <li>
+                  Open via Contentstack (App Full Page) to get real SDK values.
+                </li>
+                <li>
+                  Direct test: /marketplace?mock (forces mock), /marketplace?debug
+                  (shows snapshot).
+                </li>
+                <li>
+                  Replace scaffold with actual features once initialization confirmed.
+                </li>
               </ol>
             </section>
             {debug && sdk && (
               <details style={{ marginTop: 24 }} open>
-                <summary style={{ cursor: 'pointer', fontWeight: 600 }}>Debug: Raw SDK snapshot</summary>
-                <pre style={{ marginTop: 12, fontSize: 12, background: '#f5f5f5', padding: 12, overflow: 'auto' }}>{JSON.stringify(safeSerializeSDK(sdk), null, 2)}</pre>
+                <summary style={{ cursor: 'pointer', fontWeight: 600 }}>
+                  Debug: Raw SDK snapshot
+                </summary>
+                <pre
+                  style={{
+                    marginTop: 12,
+                    fontSize: 12,
+                    background: '#f5f5f5',
+                    padding: 12,
+                    overflow: 'auto',
+                  }}
+                >
+                  {JSON.stringify(safeSerializeSDK(sdk), null, 2)}
+                </pre>
               </details>
             )}
           </div>
@@ -97,7 +157,14 @@ export default function MarketplaceAppPage() {
   }, [state, error, info, debug, sdk, init]);
 
   return (
-    <div style={{ fontFamily: 'system-ui, sans-serif', padding: 24, lineHeight: 1.4, color: '#222' }}>
+    <div
+      style={{
+        fontFamily: 'system-ui, sans-serif',
+        padding: 24,
+        lineHeight: 1.4,
+        color: '#222',
+      }}
+    >
       {content}
     </div>
   );
@@ -112,25 +179,32 @@ function Info({ label, value }: { label: string; value?: string }) {
   );
 }
 
-function Status({ type, message, onRetry }: { type: 'loading' | 'error'; message: string; onRetry?: () => void }) {
+function Status({
+  type,
+  message,
+  onRetry,
+}: {
+  type: 'loading' | 'error';
+  message: string;
+  onRetry?: () => void;
+}) {
   const color = type === 'error' ? '#b00020' : '#444';
   return (
     <div style={{ fontSize: 14, color }}>
       {message}
       {type === 'error' && onRetry && (
-        <button style={{ marginLeft: 12, padding: '4px 10px', fontSize: 12 }} onClick={onRetry}>Retry</button>
+        <button
+          style={{ marginLeft: 12, padding: '4px 10px', fontSize: 12 }}
+          onClick={onRetry}
+        >
+          Retry
+        </button>
       )}
     </div>
   );
 }
 
-// Avoid circular references when showing the SDK object
 function safeSerializeSDK(sdk: any) {
-  const {
-    stack, organization, currentUser, location, app, params
-    // frame intentionally omitted (contains window refs)
-  } = sdk as any;
-  return {
-    stack, organization, currentUser, location, app, params
-  };
+  const { stack, organization, currentUser, location, app, params, mock } = sdk || {};
+  return { stack, organization, currentUser, location, app, params, mock };
 }
