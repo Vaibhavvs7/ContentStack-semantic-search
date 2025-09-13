@@ -166,33 +166,31 @@ export default function Home() {
   ];
 
   return (
-    <main className="min-h-screen bg-gray-50">
+    <main className="min-h-screen bg-neutral-50">
       <div className="mx-auto max-w-7xl px-6 py-8">
         {/* Header / Search area */}
-        <div className="bg-white rounded-lg shadow-sm p-6 mb-6">
+        <div className="rounded-lg border border-neutral-200 bg-white/60 backdrop-blur-sm shadow-sm p-6 mb-6">
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-3">
               <div className="text-2xl">🔍</div>
               <div>
-                <h1 className="text-xl font-bold">Semantic Search</h1>
-                <div className="text-sm text-gray-500">
-                  Search across your Contentstack entries (semantic / embeddings)
-                </div>
+                <h1 className="text-xl font-semibold tracking-tight text-gray-800">Semantic Search</h1>
+                <div className="text-sm text-gray-500 mt-0.5">Search across your Contentstack entries (semantic / embeddings)</div>
               </div>
             </div>
 
-            <div className="text-sm text-gray-600">Stack: <strong>ContentStackExplorer</strong></div>
+            <div className="text-sm text-gray-600">Stack: <strong className="font-semibold text-gray-700">ContentStackExplorer</strong></div>
           </div>
 
           {/* Search form */}
           <form onSubmit={handleSearch} className="flex gap-3">
-            <div className="relative flex-1">
+            <div className="relative flex-1 group">
               <input
                 type="text"
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
                 placeholder="Search entries (e.g. DataSync, Kickstart, etc.)"
-                className="w-full rounded border pl-4 pr-10 py-3 shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-300"
+                className="w-full rounded-md border border-neutral-300 bg-white/90 pl-4 pr-10 py-3 shadow-sm focus:outline-none focus:ring-2 focus:ring-sky-400 focus:border-sky-400 text-sm placeholder:text-neutral-400"
                 aria-label="Search entries"
               />
               {query && (
@@ -204,7 +202,7 @@ export default function Home() {
                   setResults([]);
                   setError(null);
                   }}
-                  className="absolute inset-y-0 right-2 flex items-center px-2 text-gray-800 hover:text-gray-600 focus:outline-none text-2xl"
+                  className="absolute inset-y-0 right-1.5 flex items-center px-2 text-gray-500 hover:text-gray-700 focus:outline-none text-2xl"
                 >
                   ×
                 </button>
@@ -213,7 +211,7 @@ export default function Home() {
             <button
               type="submit"
               disabled={loading}
-              className="bg-blue-600 text-white px-5 py-3 rounded hover:bg-blue-700 disabled:opacity-60"
+              className="bg-sky-600 hover:bg-sky-700 active:bg-sky-800 disabled:opacity-60 disabled:hover:bg-sky-600 text-white px-5 py-3 rounded-md font-medium shadow-sm focus:outline-none focus:ring-2 focus:ring-sky-400 focus:ring-offset-1 focus:ring-offset-white"
             >
               {loading ? "Searching..." : "Search"}
             </button>
@@ -234,6 +232,21 @@ export default function Home() {
               </button>
             ))}
           </div>
+          {/* Error banner */}
+          {error && (
+            <div className="mt-4 rounded-md border border-red-300 bg-red-50 px-4 py-3 text-sm text-red-700 flex items-start gap-3">
+              <span className="mt-0.5">⚠️</span>
+              <div className="flex-1">
+                <strong className="font-semibold">Error:</strong> {error}
+                <button
+                  onClick={() => setError(null)}
+                  className="ml-3 underline hover:no-underline"
+                >
+                  Dismiss
+                </button>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Main content area — results table + (optional) right column */}
@@ -241,42 +254,72 @@ export default function Home() {
           {/* Left: results table (takes most space) */}
           <div className="lg:col-span-9">
             {/* Toolbar */}
-            <div className="flex items-center justify-between mb-3">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-3 gap-3">
               <div className="flex items-center gap-3">
-                <div className="text-sm text-gray-600">Filter</div>
-                <select
-                  value={selectedType}
-                  onChange={(e) => {
-                    // Client-side filter only; no network call.
-                    setSelectedType(e.target.value);
-                  }}
-                  className="border rounded px-3 py-1 text-sm"
-                >
-                  {contentTypes.map((t) => (
-                    <option key={t} value={t}>
-                      {t === "all" ? "All content types" : t}
-                    </option>
-                  ))}
-                </select>
+                <label htmlFor="contentTypeFilter" className="text-xs uppercase tracking-wide font-medium text-neutral-600">Filter</label>
+                <div className="relative">
+                  <select
+                    id="contentTypeFilter"
+                    value={selectedType}
+                    onChange={(e) => {
+                      setSelectedType(e.target.value);
+                    }}
+                    className="appearance-none text-sm rounded-md border border-neutral-300 bg-white/70 backdrop-blur px-3 pr-9 py-1.5 shadow-sm focus:outline-none focus:ring-2 focus:ring-sky-400 focus:border-sky-400 text-neutral-700"
+                  >
+                    {contentTypes.map((t) => (
+                      <option key={t} value={t}>
+                        {t === "all" ? "All content types" : t}
+                      </option>
+                    ))}
+                  </select>
+                  <span className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-neutral-400 text-xs">▾</span>
+                </div>
+                {selectedType !== 'all' && (
+                  <button
+                    onClick={() => setSelectedType('all')}
+                    className="text-xs font-medium text-sky-600 hover:text-sky-700 underline decoration-dotted"
+                  >Reset</button>
+                )}
               </div>
 
-              <div className="text-sm text-gray-500">
-                {loading ? "Searching..." : `${shownResults.length} result(s)`}
+              <div className="text-sm text-neutral-500 font-medium">
+                {loading ? "Searching..." : `${shownResults.length} result${shownResults.length === 1 ? '' : 's'}`}
               </div>
             </div>
 
-            {/* Table header */}
-            <div className="hidden md:flex bg-gray-100 px-4 py-2 rounded-t text-sm text-gray-600 font-medium">
+            {/* Table header (desktop) */}
+            <div className="hidden md:flex bg-neutral-100 px-4 py-2 rounded-t text-[11px] uppercase tracking-wide text-neutral-600 font-medium border border-neutral-200">
               <div className="w-1/3">Title</div>
               <div className="w-1/6">Content Type</div>
               <div className="w-1/2">Snippet</div>
               <div className="w-24 text-right">Score</div>
             </div>
 
-            {/* Results list */}
-            <div className="bg-white border rounded-b divide-y">
+            {/* Results list (desktop table) */}
+            <div className="hidden md:block bg-white border border-neutral-200 rounded-b divide-y divide-neutral-100">
               {shownResults.length === 0 && !loading && query && (
                 <div className="p-6 text-gray-600">No results found for <strong>{query}</strong>.</div>
+              )}
+
+              {/* Loading skeletons */}
+              {loading && (
+                <>
+                  {Array.from({ length: 5 }).map((_, idx) => (
+                    <div key={idx} className="flex flex-col md:flex-row items-start md:items-center px-4 py-4 gap-3 animate-pulse">
+                      <div className="md:w-1/3 w-full space-y-2">
+                        <div className="h-4 bg-neutral-200 rounded" />
+                        <div className="h-3 bg-neutral-100 rounded w-2/3 hidden md:block" />
+                      </div>
+                      <div className="md:w-1/6 h-4 bg-neutral-100 rounded w-24" />
+                      <div className="md:w-1/2 w-full space-y-2">
+                        <div className="h-3 bg-neutral-100 rounded" />
+                        <div className="h-3 bg-neutral-100 rounded w-5/6" />
+                        <div className="h-3 bg-neutral-100 rounded w-2/3" />
+                      </div>
+                      <div className="md:w-24 w-16 h-4 bg-neutral-100 rounded self-stretch" />
+                    </div>
+                  ))}
+                </>
               )}
 
               {shownResults.map((r, i) => {
@@ -288,7 +331,12 @@ export default function Home() {
 
                 const score = typeof r.score === "number" ? r.score : 0;
                 return (
-                  <div key={r.id || i} className="flex flex-col md:flex-row items-start md:items-center px-4 py-4 gap-3">
+                  <div
+                    key={r.id || i}
+                    className={`flex flex-col md:flex-row items-start md:items-center px-4 py-4 gap-3 text-sm transition-colors ${
+                      i % 2 === 0 ? "bg-white" : "bg-neutral-50"
+                    } hover:bg-sky-50/60`}
+                  >
                     <div className="md:w-1/3">
                       <Link href={url} className="text-sm font-medium text-gray-900 hover:underline">
                         {title}
@@ -302,18 +350,72 @@ export default function Home() {
 
                     <div className="md:w-1/2 text-sm text-gray-700 prose-sm" dangerouslySetInnerHTML={{ __html: snippetHtml }} />
 
-                    <div className="md:w-24 text-right text-sm text-gray-500">
-                      {(score * 100).toFixed(1)}%
-                      <div className="mt-2">
+                    <div className="md:w-24 text-right text-xs text-gray-500 space-y-1">
+                      <div className="font-medium text-gray-700 text-[11px] tracking-wide">{(score * 100).toFixed(0)}%</div>
+                      <div className="h-2.5 rounded-full bg-neutral-200 overflow-hidden">
+                        <div
+                          className="h-full bg-gradient-to-r from-sky-500 to-indigo-500 transition-all duration-500"
+                          style={{ width: `${Math.min(100, Math.max(0, score * 100))}%` }}
+                        />
+                      </div>
+                      <div className="pt-1">
                         <a
                           href={url}
-                          className="text-xs text-blue-600 hover:underline"
+                          className="inline-block text-[11px] font-medium text-sky-600 hover:text-sky-700 hover:underline"
                           target="_blank"
                           rel="noreferrer"
                         >
                           Open
                         </a>
                       </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* Mobile cards */}
+            <div className="md:hidden space-y-4">
+              {loading && (
+                <div className="space-y-3">
+                  {Array.from({ length: 4 }).map((_, i) => (
+                    <div key={i} className="rounded-lg border border-neutral-200 bg-white p-4 shadow-xs animate-pulse space-y-3">
+                      <div className="h-4 bg-neutral-200 rounded w-2/3" />
+                      <div className="h-3 bg-neutral-100 rounded w-1/3" />
+                      <div className="h-3 bg-neutral-100 rounded" />
+                      <div className="h-3 bg-neutral-100 rounded w-5/6" />
+                    </div>
+                  ))}
+                </div>
+              )}
+              {!loading && shownResults.length === 0 && query && (
+                <div className="rounded-md border border-neutral-200 bg-white p-4 text-sm text-neutral-600">No results found for <strong>{query}</strong>.</div>
+              )}
+              {!loading && shownResults.map((r, i) => {
+                const title = r.metadata?.title || 'Untitled';
+                const type = r.metadata?.type || 'unknown';
+                const url = r.metadata?.url || '#';
+                const rawSnippet = getSnippet(r, query);
+                const snippetHtml = DOMPurify.sanitize(highlight(rawSnippet, query));
+                const score = typeof r.score === 'number' ? r.score : 0;
+                return (
+                  <div key={r.id || i} className="rounded-lg border border-neutral-200 bg-white p-4 shadow-sm hover:border-sky-300 transition-colors">
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <Link href={url} className="font-medium text-sm text-gray-900 hover:underline">{title}</Link>
+                        <div className="mt-1 text-[11px] uppercase tracking-wide text-neutral-500 font-medium">{type}</div>
+                      </div>
+                      <div className="text-right w-20">
+                        <div className="text-[11px] font-medium text-gray-700">{(score*100).toFixed(0)}%</div>
+                        <div className="h-2 rounded-full bg-neutral-200 overflow-hidden">
+                          <div className="h-full bg-sky-500" style={{width: `${Math.min(100, Math.max(0, score*100))}%`}} />
+                        </div>
+                      </div>
+                    </div>
+                    <div className="mt-3 text-xs text-neutral-700 leading-relaxed" dangerouslySetInnerHTML={{__html: snippetHtml}} />
+                    <div className="mt-3 flex items-center justify-between">
+                      <code className="text-[10px] bg-neutral-100 rounded px-1.5 py-0.5 text-neutral-500">{r.metadata?.uid || '-'}</code>
+                      <a href={url} target="_blank" rel="noreferrer" className="text-[11px] font-medium text-sky-600 hover:text-sky-700 hover:underline">Open</a>
                     </div>
                   </div>
                 );
@@ -343,35 +445,7 @@ export default function Home() {
           </aside>
         </div>
 
-        {/* Optional CMS page preview below */}
-        <section className="mt-8 p-4">
-          {page?.title && (
-            <h2 className="text-2xl font-bold mb-2" {...(page?.$ && page?.$.title)}>{page?.title}</h2>
-          )}
-          {page?.description && <p {...(page?.$ && page?.$.description)} className="text-gray-600 mb-4">{page?.description}</p>}
-
-          {page?.rich_text && (
-            <div dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(page?.rich_text) }} />
-          )}
-
-          <div className={`space-y-8 max-w-full mt-4 ${!page?.blocks || page.blocks.length === 0 ? VB_EmptyBlockParentClass : ""}`} {...(page?.$ && page?.$.blocks)}>
-            {page?.blocks?.map((item, index) => {
-              const { block } = item;
-              const isImageLeft = block.layout === "image_left";
-              return (
-                <div key={block._metadata.uid} className={`flex flex-col md:flex-row items-center space-y-4 md:space-y-0 bg-white ${isImageLeft ? "md:flex-row" : "md:flex-row-reverse"}`}>
-                  <div className="w-full md:w-1/2">
-                    {block.image && <Image src={block.image.url} alt={block.image.title} width={200} height={112} className="w-full" {...(block?.$ && block?.$.image)} />}
-                  </div>
-                  <div className="w-full md:w-1/2 p-4">
-                    {block.title && <h3 className="text-xl font-bold" {...(block?.$ && block?.$.title)}>{block.title}</h3>}
-                    {block.copy && <div dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(block.copy) }} className="prose" {...(block?.$ && block?.$.copy)} />}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </section>
+        
       </div>
     </main>
   );
