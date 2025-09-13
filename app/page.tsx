@@ -4,17 +4,11 @@ import CSlogo from "./CSlogo.webp";
 import DOMPurify from "dompurify";
 import Image from "next/image";
 import Link from "next/link";
-import { getPage, initLivePreview } from "@/lib/contentstack";
+import { initLivePreview } from "@/lib/contentstack";
 import { useEffect, useMemo, useState } from "react";
-import { Page } from "@/lib/types";
 import ContentstackLivePreview from "@contentstack/live-preview-utils";
 
-/**
- * Semantic Search UI
- */
-
 export default function Home() {
-  const [page, setPage] = useState<Page>();
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
@@ -29,15 +23,9 @@ export default function Home() {
     }
   }, [query, results.length]);
 
-  const getContent = async () => {
-    const page = await getPage("/");
-    setPage(page);
-  };
-
   useEffect(() => {
     initLivePreview();
-    ContentstackLivePreview.onEntryChange(getContent);
-    getContent();
+    ContentstackLivePreview.onEntryChange(() => {});
     (async () => {
       try {
         const res = await fetch("/api/content-types");
@@ -144,18 +132,20 @@ export default function Home() {
 
   return (
     <main className="min-h-screen bg-neutral-50">
-      {/* Fixed Sidebar */}
       <aside className="hidden lg:flex fixed inset-y-0 left-0 w-60 flex-col bg-white border-r border-neutral-200 shadow-sm z-20">
         <div className="flex items-center gap-2 px-5 py-5 border-b border-neutral-100">
-          {/* Place CSlogo.webp inside /public folder */}
-            <Image
-              src={CSlogo}
-              alt="Contentstack Logo"
-              width={32}
-              height={32}
-              className="w-8 h-8"
-              priority
-            />
+          <Image
+            src={CSlogo}
+            alt="Contentstack Logo"
+            width={32}
+            height={32}
+            className="w-8 h-8"
+            priority
+            onError={(e) => {
+              // fallback if image missing
+              (e.target as HTMLImageElement).style.display = "none";
+            }}
+          />
           <span className="text-lg font-bold text-[#882de3] tracking-tight">
             Contentstack
           </span>
@@ -197,9 +187,7 @@ export default function Home() {
         </div>
       </aside>
 
-      {/* Main Content (shifted for sidebar on large screens) */}
       <div className="lg:ml-60 px-6 py-8 max-w-7xl mx-auto">
-        {/* Search Header */}
         <div className="rounded-lg border border-neutral-200 bg-white/60 backdrop-blur-sm shadow-sm p-6 mb-6">
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-3">
@@ -255,41 +243,39 @@ export default function Home() {
             </button>
           </form>
 
-            <div className="mt-4 flex flex-wrap gap-2">
-              {suggestions.map((s) => (
-                <button
-                  key={s}
-                  onClick={() => {
-                    setQuery(s);
-                    void handleSearch(undefined, s);
-                  }}
-                  className="text-sm bg-indigo-50 text-indigo-700 px-3 py-1 rounded border border-indigo-100 hover:bg-indigo-100"
-                >
-                  {s}
-                </button>
-              ))}
-            </div>
+          <div className="mt-4 flex flex-wrap gap-2">
+            {suggestions.map((s) => (
+              <button
+                key={s}
+                onClick={() => {
+                  setQuery(s);
+                  void handleSearch(undefined, s);
+                }}
+                className="text-sm bg-indigo-50 text-indigo-700 px-3 py-1 rounded border border-indigo-100 hover:bg-indigo-100"
+              >
+                {s}
+              </button>
+            ))}
+          </div>
 
-            {error && (
-              <div className="mt-4 rounded-md border border-red-300 bg-red-50 px-4 py-3 text-sm text-red-700 flex items-start gap-3">
-                <span className="mt-0.5">⚠️</span>
-                <div className="flex-1">
-                  <strong className="font-semibold">Error:</strong> {error}
-                  <button
-                    onClick={() => setError(null)}
-                    className="ml-3 underline hover:no-underline"
-                  >
-                    Dismiss
-                  </button>
-                </div>
+          {error && (
+            <div className="mt-4 rounded-md border border-red-300 bg-red-50 px-4 py-3 text-sm text-red-700 flex items-start gap-3">
+              <span className="mt-0.5">⚠️</span>
+              <div className="flex-1">
+                <strong className="font-semibold">Error:</strong> {error}
+                <button
+                  onClick={() => setError(null)}
+                  className="ml-3 underline hover:no-underline"
+                >
+                  Dismiss
+                </button>
               </div>
-            )}
+            </div>
+          )}
         </div>
 
-        {/* Results + Right Panels */}
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
           <div className="lg:col-span-9">
-            {/* Mobile filter */}
             <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-3 gap-3">
               <div className="flex items-center gap-3 lg:hidden">
                 <label
@@ -334,7 +320,6 @@ export default function Home() {
               </div>
             </div>
 
-            {/* Desktop header */}
             <div className="hidden md:flex bg-neutral-100 px-4 py-2 rounded-t text-[11px] uppercase tracking-wide text-neutral-600 font-medium border border-neutral-200">
               <div className="w-1/3">Title</div>
               <div className="w-1/6">Content Type</div>
@@ -342,7 +327,6 @@ export default function Home() {
               <div className="w-24 text-right">Score</div>
             </div>
 
-            {/* Desktop results */}
             <div className="hidden md:block bg-white border border-neutral-200 rounded-b divide-y divide-neutral-100">
               {shownResults.length === 0 && !loading && query && (
                 <div className="p-6 text-gray-600">
@@ -430,7 +414,6 @@ export default function Home() {
               })}
             </div>
 
-            {/* Mobile cards */}
             <div className="md:hidden space-y-4">
               {loading && (
                 <div className="space-y-3">
@@ -519,12 +502,13 @@ export default function Home() {
             </div>
           </div>
 
-          {/* Right info panels */}
           <aside className="lg:col-span-3">
             <div className="bg-white border rounded p-4 shadow-sm">
               <h3 className="text-sm font-semibold mb-2">Search tips</h3>
               <ul className="text-sm text-gray-600 list-disc pl-5 space-y-2">
-                <li>Try natural language queries (e.g. "DataSync to local DB").</li>
+                <li>
+                  Try natural language queries (e.g. &quot;DataSync to local DB&quot;).
+                </li>
                 <li>Use content-type filter to narrow results.</li>
                 <li>
                   Click <em>Open</em> to view the original entry in a new tab.
