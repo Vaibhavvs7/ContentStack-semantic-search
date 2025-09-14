@@ -84,10 +84,12 @@ Both builds share identical code; CSP / frame headers adjusted for iframe embedd
 <p align="center">
   <img src="public/highdark.png" alt="High-Level Architecture" width="850" />
 </p>
+<div align="center"><em>fig. High-Level Architecture</em></div>
 
 <p align="center">
   <img src="public/lowdark.png" alt="Low-Level Architecture" width="850" />
 </p>
+<div align="center"><em>fig. Low-Level Architecture</em></div>
 
 Planned / Included Diagram Set:
 1. System Architecture (Browser UI → API Routes → Embedding Provider → Vector Store (Pinecone) → Contentstack APIs)  
