@@ -67,26 +67,34 @@ Both builds share identical code; CSP / frame headers adjusted for iframe embedd
 
 ## 6. UI Preview
 
-(Add your screenshot image file to `public/ui-preview.png` or similar.)
-
 <p align="center">
-  <img src="public/ui-preview.png" alt="UI Preview" width="850" />
+  <img src="public/ui-preview.png" alt="Application UI Preview" width="850" />
 </p>
 
-> Sidebar with content types (left), semantic query bar (top), results table (center), tips panel (right).
+> The interface combines:  
+> • Left: Persistent content type sidebar filter  
+> • Top: Semantic / natural language query bar with suggestions  
+> • Center: Ranked results table (desktop) or stacked cards (mobile)  
+> • Right: Contextual help / guidance panel  
 
 ---
 
-## 7. (Upcoming) Architecture & Workflow Diagrams
+## 7. Architecture & Workflow Diagrams
 
-Place planned diagrams here:
+<p align="center">
+  <img src="public/highdark.png" alt="High-Level Architecture" width="850" />
+</p>
 
-1. System Architecture (Client ↔ API ↔ Embedding Provider ↔ Pinecone ↔ Contentstack)  
-2. Indexing / Reindex Flow  
-3. Search Execution Sequence (timing + thresholding)
+<p align="center">
+  <img src="public/lowdark.png" alt="Low-Level Architecture" width="850" />
+</p>
 
-Add images under `public/diagrams/` and reference them:
+Planned / Included Diagram Set:
+1. System Architecture (Browser UI → API Routes → Embedding Provider → Vector Store (Pinecone) → Contentstack APIs)  
+2. Index / Reindex Flow (Webhook trigger → fetch changed entries → embed → upsert vectors → confirm)  
+3. Search Execution Sequence (query submission → embed → similarity query → threshold filtering → enrichment → response)  
 
+Add future or alternate diagram assets under:
 ```
 public/diagrams/architecture.png
 public/diagrams/search-flow.png
