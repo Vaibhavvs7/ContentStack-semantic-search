@@ -122,3 +122,70 @@
 .btn-secondary:hover {
   background: #E5E7EB;
 }
+
+.entry-field-grid {
+  display: grid;
+  grid-template-columns: repeat(1, 1fr);
+  gap: 1rem;
+  margin-top: 1.5rem;
+  border-top: 1px solid #E5E7EB;
+  padding-top: 1.5rem;
+}
+
+@media (min-width: 640px) {
+  .entry-field-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+.entry-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.field-label {
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: #6B7280;
+  text-transform: capitalize;
+}
+
+.field-value {
+  font-size: 0.875rem;
+  color: #111827;
+  line-height: 1.5;
+}
+
+.field-value.rich-text {
+  grid-column: span 2;
+}
+
+.tags-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.tag {
+  background: #F3F4F6;
+  padding: 0.25rem 0.75rem;
+  border-radius: 9999px;
+  font-size: 0.75rem;
+  color: #4B5563;
+}
+
+.image-container {
+  margin: 1rem 0;
+  max-width: 100%;
+  overflow: hidden;
+  background: #f3f4f6;
+  border-radius: 0.5rem;
+}
+
+.image-container img {
+  display: block;
+  max-width: 100%;
+  height: auto;
+  margin: 0 auto;
+}

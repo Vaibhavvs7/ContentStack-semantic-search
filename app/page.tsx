@@ -1,12 +1,21 @@
 "use client";
 
+import { Dialog, Transition } from '@headlessui/react';
+import { Fragment } from 'react';
+import Image from "next/image";
+import './modal.css';
+
 import CSlogo from "./CSlogo.webp";
 import DOMPurify from "dompurify";
-import Image from "next/image";
 import Link from "next/link";
 import { initLivePreview } from "@/lib/contentstack";
 import { useEffect, useMemo, useState } from "react";
 import ContentstackLivePreview from "@contentstack/live-preview-utils";
+
+const sanitize = (html: string) => {
+  if (typeof window === 'undefined') return html;
+  return DOMPurify.sanitize(html);
+};
 
 export default function Home() {
   const [query, setQuery] = useState("");
@@ -15,7 +24,8 @@ export default function Home() {
   const [error, setError] = useState<string | null>(null);
   const [selectedType, setSelectedType] = useState<string>("all");
   const [allContentTypes, setAllContentTypes] = useState<string[]>([]);
-
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [selectedEntry, setSelectedEntry] = useState<any>(null);
   useEffect(() => {
     if (query.trim() === "" && results.length > 0) {
       setResults([]);
@@ -66,6 +76,11 @@ export default function Home() {
       setLoading(false);
     }
   }
+
+  const handleEntryClick = (entry: any) => {
+    setSelectedEntry(entry);
+    setIsModalOpen(true);
+  };
 
   const contentTypes = useMemo(() => {
     if (allContentTypes.length > 0) return allContentTypes;
@@ -130,6 +145,245 @@ export default function Home() {
     "Contentstack Kickstart",
   ];
 
+  // In your EntryModal component, update the exclusions and rendering logic:
+const EntryModal = () => {
+  if (!selectedEntry) return null;
+  
+  // Helper to format field names
+  const formatFieldName = (key: string) => {
+    return key
+      .replace(/_/g, ' ')
+      .replace(/\b\w/g, l => l.toUpperCase());
+  };
+
+  // Helper to strip HTML tags
+  const stripHtml = (html: string) => {
+    const temp = document.createElement('div');
+    temp.innerHTML = html;
+    return temp.textContent || temp.innerText || '';
+  };
+
+  // Helper to render field value based on type
+const renderFieldValue = (key: string, value: any) => {
+  if (value === null || value === undefined) return '-';
+
+  // Helper to strip HTML tags
+  const stripHtml = (html: string) => {
+    const doc = new DOMParser().parseFromString(html, 'text/html');
+    return doc.body.textContent || '';
+  };
+  
+  // Handle HTML content first (like rich_text_editor)
+  if (typeof value === 'string' && (value.includes('</') || value.includes('/>'))) {
+    return (
+      <div className="field-value whitespace-pre-wrap text-sm text-gray-700">
+        {stripHtml(value)}
+      </div>
+    );
+  }
+
+  // Handle image fields by parsing JSON and extracting URL
+  if (typeof value === 'string' && key.toLowerCase().includes('image')) {
+    try {
+      const imageData = JSON.parse(value);
+      if (imageData.url) {
+        return (
+          <div className="field-value image-container">
+            <Image
+              src={imageData.url}
+              alt={imageData.title || 'Content Image'}
+              width={600}
+              height={400}
+              className="rounded-lg object-cover w-full"
+              priority={false}
+            />
+          </div>
+        );
+      }
+    } catch (e) {
+      // If not parseable JSON, check if it's a direct URL
+      if (value.startsWith('http')) {
+        return (
+          <div className="field-value image-container">
+            <Image
+              src={value}
+              alt="Content Image"
+              width={600}
+              height={400}
+              className="rounded-lg object-cover w-full"
+              priority={false}
+            />
+          </div>
+        );
+      }
+      // If not an image URL, treat as regular text
+      return <span className="field-value text-sm text-gray-700">{value}</span>;
+    }
+  }
+    
+  // Handle arrays (like tags)
+  if (Array.isArray(value)) {
+    if (value.length === 0) return <span className="field-value text-gray-500">-</span>;
+    return (
+      <div className="tags-list">
+        {value.map((item, i) => (
+          <span key={i} className="tag">{item}</span>
+        ))}
+      </div>
+    );
+  }
+
+  // Handle boolean values
+  if (typeof value === 'boolean') {
+    return (
+      <span className={`field-value font-medium ${value ? 'text-green-600' : 'text-red-600'}`}>
+        {value ? 'Yes' : 'No'}
+      </span>
+    );
+  }
+
+  // Handle objects (excluding null)
+  if (typeof value === 'object' && value !== null) {
+    try {
+      const formatted = JSON.stringify(value, null, 2);
+      return (
+        <pre className="field-value text-xs bg-gray-50 p-2 rounded overflow-auto max-h-40">
+          {formatted}
+        </pre>
+      );
+    } catch {
+      return <span className="field-value text-gray-500">Complex Object</span>;
+    }
+  }
+
+  // Default string display
+  return <span className="field-value text-sm text-gray-700">{String(value)}</span>;
+};
+
+  // Excluded fields list
+  const excludeFields = [
+    'featured_image', 
+    'url', 
+    'uid',
+    'ACL',
+    'in_progress',
+    'created_by',
+    'publish_details',
+    'updated_at',
+    'updated_by',
+    'locale',
+    'blocks',
+    '_version',
+    '_in_progress',
+    'created_at',
+    '_metadata'
+  ];
+
+  // Get filtered metadata fields
+  const fields = Object.entries(selectedEntry.metadata || {})
+    .filter(([key]) => !excludeFields.includes(key));
+
+  // Add these styles to your modal.css
+  const modalStyles = {
+    fieldContainer: `
+      border-bottom border-gray-200 
+      py-4 last:border-0
+      hover:bg-gray-50
+    `,
+    fieldLabel: `
+      text-sm font-medium text-gray-600 
+      mb-1
+    `,
+    fieldValue: `
+      text-sm text-gray-900
+      break-words
+    `
+  };
+
+  return (
+    <Transition appear show={isModalOpen} as={Fragment}>
+      <Dialog 
+        as="div"
+        className="modal-overlay"
+        onClose={() => setIsModalOpen(false)}
+      >
+        <div className="modal-container">
+          <div className="modal-content">
+            <Dialog.Panel className="modal-panel">
+              <div className="modal-header">
+                <Dialog.Title className="modal-title">
+                  {selectedEntry.metadata?.title || 'Untitled'}
+                </Dialog.Title>
+                <button
+                  onClick={() => setIsModalOpen(false)}
+                  className="modal-close"
+                >
+                  ×
+                </button>
+              </div>
+
+              <div className="modal-body">
+                {/* Featured Image */}
+                {selectedEntry.metadata?.featured_image && (
+                  <div className="entry-image mb-6">
+                    <Image
+                      src={selectedEntry.metadata.featured_image}
+                      alt={selectedEntry.metadata?.title || ''}
+                      width={800}
+                      height={450}
+                      className="object-cover rounded-lg"
+                    />
+                  </div>
+                )}
+
+                {/* Type Badge */}
+                <div className="mb-6">
+                  <span className="entry-type">
+                    {selectedEntry.metadata?.type || 'unknown'}
+                  </span>
+                </div>
+
+                {/* Fields */}
+                <div className="divide-y divide-gray-200">
+                  {fields.map(([key, value]) => (
+                    <div key={key} className={modalStyles.fieldContainer}>
+                      <div className={modalStyles.fieldLabel}>
+                        {formatFieldName(key)}
+                      </div>
+                      <div className={modalStyles.fieldValue}>
+                        {renderFieldValue(key, value)}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <div className="modal-footer">
+                <a
+                  href={selectedEntry.metadata?.url || '#'}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="btn btn-primary"
+                >
+                  Open in Contentstack
+                </a>
+                <button
+                  type="button"
+                  className="btn btn-secondary"
+                  onClick={() => setIsModalOpen(false)}
+                >
+                  Close
+                </button>
+              </div>
+            </Dialog.Panel>
+          </div>
+        </div>
+      </Dialog>
+    </Transition>
+  );
+};
+
+  
   return (
     <main className="min-h-screen bg-neutral-50">
       <aside className="hidden lg:flex fixed inset-y-0 left-0 w-60 flex-col bg-white border-r border-neutral-200 shadow-sm z-20">
@@ -366,7 +620,8 @@ export default function Home() {
                 return (
                   <div
                     key={r.id || i}
-                    className={`flex flex-col md:flex-row items-start md:items-center px-4 py-4 gap-3 text-sm transition-colors ${
+                    onClick={() => handleEntryClick(r)}
+                    className={`cursor-pointer flex flex-col md:flex-row items-start md:items-center px-4 py-4 gap-3 text-sm transition-colors ${
                       i % 2 === 0 ? "bg-white" : "bg-neutral-50"
                     } hover:bg-sky-50/60`}
                   >
@@ -527,6 +782,7 @@ export default function Home() {
           </aside>
         </div>
       </div>
+      <EntryModal />
     </main>
   );
 }
