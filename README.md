@@ -14,63 +14,34 @@
 
 ---
 
-## 1. Overview
+## 1. Discovering the Problem
 
-Run semantic (embedding) + keyword style queries over Contentstack entries (“Show AI in Healthcare articles about compliance”).  
-Embeddable as a Custom / Marketplace App (iframe) inside the Contentstack UI and deployable as a standalone website.  
-Goal: accelerate discovery, reuse, and validation of editorial content.
+When I first explored ContentStack, finding the right content felt like searching for a needle in a haystack. Typing keywords often missed relevant articles just because the phrasing was different. That’s when I thought — what if search could actually understand meaning instead of just words? That idea sparked the creation of the ContentStack Semantic Search Explorer.
 
-## 2. Why It Exists
+## 2. How I Solved It
 
-Legacy CMS search relies on literal or fuzzy text matching. This app adds embeddings + scoring so intent, synonyms, and semantic proximity drive relevance. Foundation for future AI features (clustering, Q&A, summarization, author assistance).
+I built a solution that blends semantic embeddings with traditional keyword search. It turns content into vector representations that “speak the same language” as your query. Editors can use it inside ContentStack or as a standalone app, making content discovery faster, smarter, and almost effortless.
 
 ## 3. Core Features
 
-- 🔍 Hybrid semantic + keyword search
-- 🧠 Configurable similarity thresholds & top‑K
-- 🗂 Content type filtering (sidebar + mobile)
-- 🛰 Live Preview compatible
-- 🧩 Marketplace iframe safe (CSP + no unsafe globals)
-- 🎨 Tailwind responsive UI & accessible focus states
-- 🛡 DOMPurify sanitization of snippets + highlighting
-- ♻️ Reindex / search API routes (serverless)
-- 🔌 Pluggable embedding providers (Gemini, Cohere, HF, OpenAI, Local)
-- ☁️ Pinecone vector index (or local JSON fallback)
-
-## 4. Architecture / Tech Stack
-
-| Layer | Tech |
-|-------|------|
-| UI | Next.js App Router (TS), TailwindCSS |
-| CMS | Contentstack Delivery / Preview APIs |
-| Embeddings | Gemini / Cohere / HuggingFace / OpenAI / Local service |
-| Vector Store | Pinecone (primary) + optional local JSON |
-| API | Next.js Route Handlers (`/app/api/*`) |
-| Deployment | Vercel (public) + Contentstack App domain |
-| Sanitization | DOMPurify |
-| Styling | Utility classes (Tailwind) |
-
-High level: Query → /api/search → embed text → vector similarity (Pinecone/local) + keyword fallback → filter + threshold → return normalized scores → client renders + highlights.
+- 🔍 Hybrid Search: Finds content by meaning and keywords, even if phrasing differs.
+- 🗂 Content Filters: Quickly narrow results by content type on desktop or mobile.
+- 🎨 Responsive UI: Clean, TailwindCSS-powered interface with accessible focus states.
+- 🔌 Flexible Embeddings: Works with multiple providers like Gemini, Cohere, HF, OpenAI, or local.
+- ☁️ Vector Storage: Uses Pinecone for fast similarity search, with a local JSON fallback.
 
 ---
-
-## 5. Live Deployments
-
-| Environment | URL | Notes |
-|-------------|-----|-------|
-| Standalone (Vercel) | https://content-stack-semantic-search.vercel.app/ | Public web app |
-| Contentstack App Domain | https://contentstack-semantic-search.eu-contentstackapps.com/ | Loaded inside Marketplace iframe |
-
-Both builds share identical code; CSP / frame headers adjusted for iframe embedding.
-
----
-
-## 6. UI Preview
+## 4. UI Preview
 
 <p align="center">
   <img src="public/ui-preview.png" alt="Application UI Preview" width="850" />
 </p>
-
+<p align="center">
+  <img src="public/modal1.png" alt="Application UI Preview" width="850" />
+</p>
+<p align="center">
+  <img src="public/modal2.png" alt="Application UI Preview" width="850" />
+</p>
 > The interface combines:  
 > • Left: Persistent content type sidebar filter  
 > • Top: Semantic / natural language query bar with suggestions  
@@ -79,7 +50,7 @@ Both builds share identical code; CSP / frame headers adjusted for iframe embedd
 
 ---
 
-## 7. Architecture & Workflow Diagrams
+## 5. Architecture & Workflow Diagrams
 
 <p align="center">
   <img src="public/highdark.png" alt="High-Level Architecture" width="850" />
@@ -96,13 +67,36 @@ Planned / Included Diagram Set:
 2. Index / Reindex Flow (Webhook trigger → fetch changed entries → embed → upsert vectors → confirm)  
 3. Search Execution Sequence (query submission → embed → similarity query → threshold filtering → enrichment → response)  
 
-Add future or alternate diagram assets under:
-```
-public/diagrams/architecture.png
-public/diagrams/search-flow.png
-```
 
 ---
+## 6. Architecture / Tech Stack
+
+| Layer | Tech |
+|-------|------|
+| UI | Next.js App Router (TS), TailwindCSS |
+| CMS | Contentstack Delivery / Preview APIs |
+| Embeddings | Gemini / Cohere / HuggingFace / OpenAI / Local service |
+| Vector Store | Pinecone (primary) + optional local JSON |
+| API | Next.js Route Handlers (`/app/api/*`) |
+| Deployment | Vercel (public) + Contentstack App domain |
+| Sanitization | DOMPurify |
+| Styling | Utility classes (Tailwind) |
+
+High level: Query → /api/search → embed text → vector similarity (Pinecone/local) + keyword fallback → filter + threshold → return normalized scores → client renders + highlights.
+
+---
+
+## 7. Live Deployments
+
+| Environment | URL | Notes |
+|-------------|-----|-------|
+| Standalone (Vercel) | https://content-stack-semantic-search.vercel.app/ | Public web app |
+| Contentstack App Domain | https://contentstack-semantic-search.eu-contentstackapps.com/ | Loaded inside Marketplace iframe |
+
+Both builds share identical code; CSP / frame headers adjusted for iframe embedding.
+
+---
+
 
 ## 8. Installation (Local Dev)
 
@@ -170,42 +164,15 @@ Never commit real secrets. (Rotate any keys previously exposed.)
 | SEARCH_RELATIVE_FRACTION | Relative top score retention fraction |
 | SEARCH_TOP_K | Max candidates returned pre-filter |
 
-### Example `.env.example` (sanitized)
-
-```bash
-EMBEDDING_PROVIDER=gemini
-GEMINI_EMBEDDING_MODEL=gemini-embedding-001
-GEMINI_API_KEY=YOUR_GEMINI_KEY
-VECTOR_STORE_DIM=768
-PINECONE_API_KEY=YOUR_PINECONE_KEY
-PINECONE_INDEX_NAME=contentstack-semantic-search
-
-# Local vector fallback
-# VECTOR_STORE_PERSIST_PATH=./vectorStore.json
-
-NEXT_PUBLIC_CONTENTSTACK_API_KEY=YOUR_STACK_KEY
-CONTENTSTACK_DELIVERY_TOKEN=YOUR_DELIVERY_TOKEN
-CONTENTSTACK_PREVIEW_TOKEN=YOUR_PREVIEW_TOKEN
-NEXT_PUBLIC_CONTENTSTACK_ENVIRONMENT=YOUR_ENV
-NEXT_PUBLIC_CONTENTSTACK_REGION=EU
-NEXT_PUBLIC_CONTENTSTACK_PREVIEW=false
-CONTENTSTACK_MANAGEMENT_TOKEN=YOUR_MGMT_TOKEN
-
-WEBHOOK_SECRET=replace-this
-
-SEARCH_MIN_SCORE=0.22
-SEARCH_RELATIVE_FRACTION=0.75
-SEARCH_TOP_K=10
-```
-
 ---
+
 
 ## 10. Usage
 
 1. Enter a natural language query (e.g. “Composable commerce starter”).  
 2. Press Enter or click the purple Search button.  
 3. Filter by content type via sidebar or mobile dropdown.  
-4. Click “Open” to view the entry in a new tab.  
+4. Click On the entries modal will open showing all the metadata fetched from stack entries.  
 5. Adjust provider / thresholds via env vars and redeploy.
 
 Example queries:
@@ -243,54 +210,18 @@ Example queries:
 
 ---
 
-## 12. Deployment Notes
-
-| Target | Key Steps |
-|--------|-----------|
-| Vercel | Add env vars → build → ensure no blocking X-Frame-Options |
-| Contentstack App | Use Vercel or App Domain URL; add CSP `frame-ancestors` for Contentstack; register Hosted App URL |
-| CSP | Include: `frame-ancestors https://app.contentstack.com https://*.contentstack.com` |
-| Assets | Place logos / diagrams in `public/` (auto served) |
-
----
 
 ## 13. Future (Planned)
 
-- Multi-locale search + switcher
-- Faceted filters (tags, author, date)
 - Hybrid BM25 + vector weighting toggle
 - Relevance feedback (interactive re‑rank)
 - Query suggestion + auto-complete
-- Background indexer + queue
-- Entry edit deep-links + inline preview actions
-- Embedding cache + eviction policy
+
+
+
 
 ---
 
-## 14. Security & Key Hygiene
 
-- Do not ship Delivery / Preview / Management tokens with `NEXT_PUBLIC_`.
-- Rotate any tokens committed previously.
-- Restrict Pinecone index & provider keys via dashboard policies.
-- Validate webhooks with `WEBHOOK_SECRET` before reindex actions.
-
----
-
-## 15. Acknowledgements
-
-Contentstack • Pinecone • Next.js • TailwindCSS • (Gemini / Cohere / Hugging Face / OpenAI) • Community contributors.
-
----
-
-### Quick Start
-
-```bash
-git clone <repo>
-cd ContentStackExplorer
-npm install
-cp .env.example .env.local
-# fill env values
-npm run dev
-```
 
 Happy searching.
