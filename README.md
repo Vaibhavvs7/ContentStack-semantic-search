@@ -1,4 +1,4 @@
-# Contentstack Semantic Search Explorer
+# Semantic Search Explorer
 
 > Natural‑language semantic + keyword search across your Contentstack content (embeddings + vector similarity) with a clean UI & Marketplace app integration.
 
@@ -13,7 +13,7 @@
 
 ## 1. Discovering the Problem
 
-When I first explored ContentStack, finding the right content felt like searching for a needle in a haystack. Typing keywords often missed relevant articles just because the phrasing was different. That’s when I thought — what if search could actually understand meaning instead of just words? That idea sparked the creation of the ContentStack Semantic Search Explorer.
+When I first explored ContentStack, finding the right content felt like searching for a needle in a haystack. Typing keywords often missed relevant articles just because the phrasing was different. That’s when I thought — what if search could actually understand meaning instead of just words? That idea sparked the creation of the  Semantic Search Explorer.
 
 ## 2. How I Solved It
 
