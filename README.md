@@ -2,9 +2,6 @@
 
 > Natural‑language semantic + keyword search across your Contentstack content (embeddings + vector similarity) with a clean UI & Marketplace app integration.
 
-<p align="left">
-  <img src="public/ContentStack.png" alt="Contentstack" height="54" />
-</p>
 
 
 ![Next.js](https://img.shields.io/badge/Next.js-15-black?logo=next.js)
